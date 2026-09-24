@@ -1,7 +1,13 @@
-def is_valid_email(address: str) -> bool:
-    """Return whether address has an @ and a dot after it."""
-    if len(address) > 254:
-        return False
+import re
 
-    at_index = address.find("@")
-    return at_index != -1 and "." in address[at_index + 1:]
+
+EMAIL_PATTERN = re.compile(
+    r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$"
+)
+
+
+def is_valid_email(address: str) -> bool:
+    """Return whether address has a practical email format."""
+    return len(address) <= 254 and EMAIL_PATTERN.fullmatch(address) is not None
