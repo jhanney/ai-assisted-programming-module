@@ -35,22 +35,19 @@ def semantic_search(query, collection, model, top_k=3):
         distance = 1 - cosine similarity (lower is closer). Convert it back
         with similarity = 1 - distance, so that higher means closer.
     """
-    # TODO: Exercise 3.1
-    # 1. query_embedding = model.encode(query)
-    # 2. results = collection.query(
-    #        query_embeddings=[query_embedding.tolist()],
-    #        n_results=top_k
-    #    )
-    # 3. Pull out, for each hit:
-    #      results['documents'][0]   -> the chunk texts
-    #      results['metadatas'][0]   -> dicts with the 'source' filename
-    #      results['distances'][0]   -> distances (lower = closer)
-    # 4. Return [(text, source, 1 - distance), ...]
-    #
-    # GitHub Copilot Prompt: "Query a ChromaDB collection with an embedding and return text, metadata source and similarity for the top k hits"
-
-    # YOUR CODE HERE
-    pass  # Remove this line when you add your code
+    query_embedding = model.encode(query)
+    results = collection.query(
+        query_embeddings=[query_embedding.tolist()],
+        n_results=top_k,
+    )
+    return [
+        (text, metadata["source"], 1 - distance)
+        for text, metadata, distance in zip(
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0],
+        )
+    ]
 
 
 def filter_by_relevance(results, min_similarity=0.2):

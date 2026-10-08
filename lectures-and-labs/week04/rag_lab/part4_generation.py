@@ -36,9 +36,10 @@ DEFAULT_MODEL = "gemini-3.5-flash-lite"
 GROUNDING_RULES = (
     "Answer the question using ONLY the context below. "
     "If the context does not contain the answer, reply exactly: "
-    "I don't know - the provided context does not cover this. "
-    "Finish your answer with the document you used, in square brackets, "
-    "like [source: introduction_to_programming.txt]."
+    "I don't know - the provided context does not cover this. Do not add "
+    "anything to that refusal. For an answer supported by the context, "
+    "finish with the document you used, in square brackets, like "
+    "[source: introduction_to_programming.txt]."
 )
 
 
@@ -57,22 +58,10 @@ def initialize_llm():
     Returns:
         OpenAI client object, or None when no key is set
     """
-    # TODO: Exercise 4.1
-    # 1. Get the key, base URL and model name from llm_settings()
-    # 2. If there is no key, return None -- the rest of the lab then runs
-    #    retrieval only and skips generation
-    # 3. Create and return an OpenAI client pointed at that base URL
-    #
-    # Usage:
-    # api_key, base_url, model = llm_settings()
-    # if not api_key:
-    #     return None
-    # client = OpenAI(api_key=api_key, base_url=base_url)
-    #
-    # GitHub Copilot Prompt: "Create an OpenAI client with a custom base_url from environment settings"
-
-    # YOUR CODE HERE
-    pass  # Remove this line when you add your code
+    api_key, base_url, _ = llm_settings()
+    if not api_key:
+        return None
+    return OpenAI(api_key=api_key, base_url=base_url)
 
 
 def build_rag_prompt(query, context_chunks):
@@ -86,32 +75,16 @@ def build_rag_prompt(query, context_chunks):
     Returns:
         The prompt string
     """
-    # TODO: Exercise 4.2
-    # Build a prompt that:
-    # 1. States GROUNDING_RULES
-    # 2. Lists every chunk, each prefixed "[source: <file>]" so the model can
-    #    say which document it used
-    # 3. Puts the question after the context
-    #
-    # Template structure:
-    #
-    #   <GROUNDING_RULES>
-    #
-    #   CONTEXT:
-    #   [source: <file>]
-    #   <chunk text>
-    #
-    #   [source: <file>]
-    #   <chunk text>
-    #
-    #   QUESTION: <query>
-    #
-    #   ANSWER:
-    #
-    # GitHub Copilot Prompt: "Build a RAG prompt with grounding rules, source-labelled context chunks and the question"
-
-    # YOUR CODE HERE
-    pass  # Remove this line when you add your code
+    context = "\n\n".join(
+        f"[source: {source}]\n{text}"
+        for text, source in context_chunks
+    )
+    return (
+        f"{GROUNDING_RULES}\n\n"
+        f"CONTEXT:\n{context}\n\n"
+        f"QUESTION: {query}\n\n"
+        "ANSWER:"
+    )
 
 
 def call_llm(client, prompt, max_tokens=500):
@@ -126,24 +99,13 @@ def call_llm(client, prompt, max_tokens=500):
     Returns:
         Generated response text
     """
-    # TODO: Part of Exercise 4.3
-    # Call the chat completions API to generate a response
-    #
-    # Usage:
-    # _, _, model = llm_settings()
-    # response = client.chat.completions.create(
-    #     model=model,
-    #     max_tokens=max_tokens,
-    #     messages=[
-    #         {"role": "user", "content": prompt}
-    #     ]
-    # )
-    # return response.choices[0].message.content
-    #
-    # GitHub Copilot Prompt: "Call an OpenAI-compatible chat completions API with a prompt"
-
-    # YOUR CODE HERE
-    pass  # Remove this line when you add your code
+    _, _, model = llm_settings()
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.choices[0].message.content
 
 
 def rag_query(question, collection, embedding_model, llm_client, top_k=3):
@@ -161,27 +123,22 @@ def rag_query(question, collection, embedding_model, llm_client, top_k=3):
         dict with 'answer' (str or None), 'sources' (list of filenames,
         best first, no repeats) and 'context_used' (list of chunk texts)
     """
-    # TODO: Exercise 4.3 - Complete RAG Pipeline
-    #
-    # Step 1: Retrieve
-    # - query_embedding = embedding_model.encode(question)
-    # - results = collection.query(query_embeddings=[query_embedding.tolist()], n_results=top_k)
-    # - texts = results['documents'][0]
-    # - sources = [m['source'] for m in results['metadatas'][0]]
-    #
-    # Step 2: Augment
-    # - prompt = build_rag_prompt(question, list(zip(texts, sources)))
-    #
-    # Step 3: Generate
-    # - answer = call_llm(llm_client, prompt) if llm_client else None
-    #
-    # Step 4: Return
-    # - {'answer': answer, 'sources': <sources without repeats>, 'context_used': texts}
-    #
-    # GitHub Copilot Prompt: "Implement a RAG pipeline: embed the question, query ChromaDB, build a prompt from the hits, call the model, return the answer with its sources"
+    query_embedding = embedding_model.encode(question)
+    results = collection.query(
+        query_embeddings=[query_embedding.tolist()],
+        n_results=top_k,
+    )
+    texts = results["documents"][0]
+    sources = [metadata["source"] for metadata in results["metadatas"][0]]
+    context_chunks = list(zip(texts, sources))
+    prompt = build_rag_prompt(question, context_chunks)
+    answer = call_llm(llm_client, prompt) if llm_client else None
 
-    # YOUR CODE HERE
-    pass  # Remove this line when you add your code
+    return {
+        "answer": answer,
+        "sources": list(dict.fromkeys(sources)),
+        "context_used": texts,
+    }
 
 
 def test_rag_system():
